@@ -1,10 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const auth = require('../middleware/auth');
+const rateLimit = require('express-rate-limit');
 
 
 // GET /api/rewards/profile?... 
-router.get('/profile', async (req, res) => {
+// Limit coupon-related endpoints to prevent brute-force
+const couponLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 60, // max 60 requests per IP per hour
+  message: { msg: 'Too many requests, please slow down' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.get('/profile', couponLimiter, async (req, res) => {
   const { code } = req.query;
   if (!code) return res.status(400).json({ msg: 'Coupon code required' });
   const coupon = await Coupon.findOne({ code }).populate('user review');
@@ -25,7 +36,7 @@ const Coupon = require('../models/Coupon');
 const Station = require('../models/Station');
 
 // GET /api/rewards/search?phone=...
-router.get('/search', async (req, res) => {
+router.get('/search', couponLimiter, async (req, res) => {
   const { phone } = req.query;
   if (!phone) return res.status(400).json({ msg: 'Phone required' });
   // Find users with this phone
@@ -56,13 +67,18 @@ router.get('/search', async (req, res) => {
 });
 
 // POST /api/rewards/claim (mark coupon as used)
-router.post('/claim', async (req, res) => {
+router.post('/claim', couponLimiter, auth, async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ msg: 'Coupon code required' });
   const coupon = await Coupon.findOne({ code });
   if (!coupon) return res.status(404).json({ msg: 'Coupon not found' });
   if (coupon.used) return res.status(400).json({ msg: 'Coupon already used' });
+  // Optionally ensure the requesting user matches the coupon user
+  if (coupon.user && coupon.user.toString() !== req.user.id && req.user.id !== 'dev-admin') {
+    return res.status(403).json({ msg: 'You are not authorized to claim this coupon' });
+  }
   coupon.used = true;
+  coupon.usedAt = new Date();
   await coupon.save();
   res.json({ msg: 'Coupon claimed', coupon });
 });

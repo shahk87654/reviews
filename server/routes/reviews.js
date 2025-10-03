@@ -7,24 +7,36 @@ const User = require('../models/User');
 const Coupon = require('../models/Coupon');
 const auth = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid');
+const mongoose = require('mongoose');
+const rateLimit = require('express-rate-limit');
 
-// Helper: check if user can review this station today
-async function canReview(userId, stationId, deviceId) {
-  const since = new Date(Date.now() - 24*60*60*1000);
+// Limit review submissions to reduce spam/brute force
+const reviewLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // max 10 review attempts per IP per hour
+  message: { msg: 'Too many review submissions from this IP, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Helper: check if a review for this station from the same user/device/ip exists in the last 24 hours
+async function hasRecentReview({ userId, stationId, deviceId, ip }) {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const query = {
     station: stationId,
-    $or: [
-      { user: userId },
-      { deviceId }
-    ],
-    createdAt: { $gte: since }
+    createdAt: { $gte: since },
+    $or: []
   };
+  if (userId) query.$or.push({ user: userId });
+  if (deviceId) query.$or.push({ deviceId });
+  if (ip) query.$or.push({ ip });
+  if (query.$or.length === 0) return false;
   const count = await Review.countDocuments(query);
-  return count === 0;
+  return count > 0;
 }
 
 // Submit review
-router.post('/', auth, [
+router.post('/', auth, reviewLimiter, [
   body('stationId').notEmpty(),
   body('rating').isInt({ min: 1, max: 5 }),
   body('comment').optional().isString(),
@@ -40,7 +52,10 @@ router.post('/', auth, [
   try {
     const station = await Station.findOne({ stationId });
     if (!station) return res.status(404).json({ msg: 'Station not found' });
-  // 24h review restriction removed: allow multiple reviews per day per station
+    // Enforce 24h restriction: prevent multiple reviews for the same station by same user/device/ip
+    const ip = req.ip || req.connection?.remoteAddress || null;
+    const recent = await hasRecentReview({ userId, stationId: station._id, deviceId, ip });
+    if (recent) return res.status(429).json({ msg: 'You can only submit one review per station every 24 hours' });
     // GPS check for first review
     const reviewCount = await Review.countDocuments({ station: station._id });
     if (reviewCount === 0 && gps) {
@@ -55,8 +70,7 @@ router.post('/', auth, [
       if (dist > 200) return res.status(400).json({ msg: 'You must be near the station to submit the first review' });
     }
     // Create review
-    const review = new Review({
-      user: userId,
+    const reviewData = {
       station: station._id,
       rating,
       cleanliness,
@@ -68,11 +82,23 @@ router.post('/', auth, [
       ip: req.ip,
       deviceId,
       gps
-    });
+    };
+    if (mongoose.isValidObjectId(userId)) reviewData.user = userId;
+    const review = new Review(reviewData);
     await review.save();
-    await User.findByIdAndUpdate(userId, { $push: { reviews: review._id } });
+    // If userId is a valid ObjectId, associate the review with the user
+    if (mongoose.isValidObjectId(userId)) {
+      try {
+        await User.findByIdAndUpdate(userId, { $push: { reviews: review._id } });
+      } catch (e) {
+        // ignore update errors for development/test users
+      }
+    }
     // Reward logic
-    const user = await User.findById(userId);
+    let user = null;
+    if (mongoose.isValidObjectId(userId)) {
+      user = await User.findById(userId);
+    }
     // Count all reviews for this user/contact (for accurate visit count)
     const phone = req.body.contact;
     const usersWithPhone = await User.find({ phone });
@@ -86,7 +112,9 @@ router.post('/', auth, [
       review.rewardGiven = true;
       await review.save();
     }
-    const visitsLeft = 5 - (visits % 5 === 0 ? 5 : visits % 5);
+    // If visits is a multiple of 5, the user just received a reward; next reward is in 5 visits
+    const remainder = visits % 5;
+    const visitsLeft = remainder === 0 ? 5 : 5 - remainder;
     res.json({ review, coupon, visits, visitsLeft });
   } catch (err) {
     res.status(500).json({ msg: 'Server error' });
