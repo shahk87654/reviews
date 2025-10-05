@@ -28,6 +28,7 @@ app.use('/api/admin', require('./routes/admin'));
 app.use('/api/captcha', require('./routes/captcha'));
 app.use('/api/rewards', require('./routes/rewards'));
 app.use('/api/health', require('./routes/health'));
+app.use('/api/alerts', require('./routes/alerts'));
 
 const connectToDatabase = require('./utils/mongodb');
 

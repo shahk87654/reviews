@@ -19,6 +19,11 @@ async function connectToDatabase() {
     const hasValidScheme = typeof uri === 'string' && /^mongodb(\+srv)?:\/\//.test(uri);
     const dbName = process.env.MONGO_DBNAME || 'admin';
 
+    console.log('MongoDB Connection Info:');
+    console.log('- MONGO_URI provided:', !!uri);
+    console.log('- MONGO_DBNAME:', dbName);
+    console.log('- URI scheme valid:', hasValidScheme);
+
     if (!hasValidScheme) {
         if (!process.env.MONGO_DBNAME && !hasValidScheme) {
             throw new Error('MONGO_URI environment variable is not set or invalid, and MONGO_DBNAME is not provided to build a fallback.');
@@ -26,6 +31,8 @@ async function connectToDatabase() {
         // Build a fallback local URI using the DB name
         uri = `mongodb://localhost:27017/${dbName}`;
         console.warn('MONGO_URI missing or invalid. Falling back to', uri);
+    } else {
+        console.log('- Using MONGO_URI:', uri.replace(/:\/\/.*@/, '://***:***@')); // Hide credentials in logs
     }
 
     const client = new MongoClient(uri, {
