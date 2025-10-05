@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const Station = require('../models/Station');
-require('dotenv').config({ path: __dirname + '/../.env' });
+require('dotenv').config({ path: __dirname + '/../../.env' });
 
 const stations = [
   { name: 'COCO ARAMCO 1 - LIBERTY', stationId: '1' },
