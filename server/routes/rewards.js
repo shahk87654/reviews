@@ -69,23 +69,30 @@ router.get('/search', couponLimiter, async (req, res) => {
 // POST /api/rewards/scan (scan and claim reward code)
 router.post('/scan', couponLimiter, async (req, res) => {
   const { code } = req.body;
-  if (!code) return res.status(400).json({ msg: 'Coupon code required' });
-  const coupon = await Coupon.findOne({ code }).populate('station');
-  if (!coupon) return res.status(404).json({ msg: 'Coupon not found' });
-  if (coupon.used) return res.status(400).json({ msg: 'Coupon already used' });
-  // Mark as used
-  coupon.used = true;
-  coupon.usedAt = new Date();
-  await coupon.save();
-  res.json({
-    code: coupon.code,
-    station: coupon.station ? coupon.station.name : 'Unknown',
-    used: true,
-    usedAt: coupon.usedAt,
-    user: coupon.user,
-    review: coupon.review,
-    message: 'Coupon claimed successfully'
-  });
+  if (!code) return res.status(400).json({ message: 'Coupon code is required' });
+  try {
+    const coupon = await Coupon.findOne({ code }).populate('station');
+    if (!coupon) return res.status(404).json({ message: 'Invalid coupon code' });
+    if (coupon.used) return res.status(400).json({ message: 'Coupon has already been claimed' });
+    if (coupon.expiresAt && new Date() > coupon.expiresAt) return res.status(400).json({ message: 'Coupon has expired' });
+    // Mark as used
+    coupon.used = true;
+    coupon.usedAt = new Date();
+    await coupon.save();
+    console.log(`Coupon ${code} claimed at ${coupon.usedAt}`);
+    res.json({
+      code: coupon.code,
+      station: coupon.station ? coupon.station.name : 'Unknown',
+      used: true,
+      usedAt: coupon.usedAt,
+      user: coupon.user,
+      review: coupon.review,
+      message: 'Coupon claimed successfully'
+    });
+  } catch (error) {
+    console.error('Error claiming coupon:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
 });
 
 // POST /api/rewards/claim (mark coupon as used)
