@@ -38,6 +38,7 @@ router.get('/', async (req, res) => {
     }
     const stations = await Station.find();
     console.log('Stations found:', stations.length);
+    console.log('Stations data:', stations.map(s => ({ name: s.name, stationId: s.stationId })));
     res.json(stations);
   } catch (err) {
     console.error('Get stations error:', err);
