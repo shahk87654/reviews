@@ -10,11 +10,7 @@ module.exports = function (req, res, next) {
     console.log('No token provided');
     return res.status(401).json({ msg: 'No token, authorization denied' });
   }
-  // Allow dev-admin-token in both development and production for admin access
-  if (token === 'dev-admin-token') {
-    req.user = { id: 'dev-admin', isAdmin: true };
-    return next();
-  }
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;

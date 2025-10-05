@@ -11,6 +11,15 @@ services:
       - key: MONGO_DBNAME
         value: aramco_review
       - key: JWT_SECRET
-        value: aramco_review_secret_key_2025
+        fromSecret: jwt_secret
       - key: NODE_ENV
         value: production
+  - type: web
+    name: aramco-review-frontend
+    env: static
+    rootDir: client
+    buildCommand: npm run build
+    staticPublishPath: build
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://aramco-review-backend.onrender.com/api

@@ -3,10 +3,20 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
+const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 
+// Rate limiter for auth endpoints to prevent brute force
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // max 5 requests per IP per window
+  message: { msg: 'Too many authentication attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Register
-router.post('/register', [
+router.post('/register', authLimiter, [
   body('email').isEmail().optional(),
   body('phone').isMobilePhone().optional(),
   body('password').isLength({ min: 6 })
@@ -27,7 +37,7 @@ router.post('/register', [
 });
 
 // Login
-router.post('/login', [
+router.post('/login', authLimiter, [
   body('email').optional().isEmail(),
   body('phone').optional().isMobilePhone(),
   body('password').exists()
