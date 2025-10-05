@@ -22,5 +22,6 @@
 
 ### 4. Deploy and Verify
 - [x] Deploy updated code to Render
-- [ ] Test the stations endpoint on production
-- [ ] Confirm error is resolved
+- [x] Test the stations endpoint on production
+- [x] Confirm error is resolved
+- [x] Populate stations database with 50 stations
