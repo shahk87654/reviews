@@ -66,6 +66,28 @@ router.get('/search', couponLimiter, async (req, res) => {
   res.json({ visits, coupons, profile: { name, contact, email, phone: phoneNum } });
 });
 
+// POST /api/rewards/scan (scan and claim reward code)
+router.post('/scan', couponLimiter, async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ msg: 'Coupon code required' });
+  const coupon = await Coupon.findOne({ code }).populate('station');
+  if (!coupon) return res.status(404).json({ msg: 'Coupon not found' });
+  if (coupon.used) return res.status(400).json({ msg: 'Coupon already used' });
+  // Mark as used
+  coupon.used = true;
+  coupon.usedAt = new Date();
+  await coupon.save();
+  res.json({
+    code: coupon.code,
+    station: coupon.station ? coupon.station.name : 'Unknown',
+    used: true,
+    usedAt: coupon.usedAt,
+    user: coupon.user,
+    review: coupon.review,
+    message: 'Coupon claimed successfully'
+  });
+});
+
 // POST /api/rewards/claim (mark coupon as used)
 router.post('/claim', couponLimiter, auth, async (req, res) => {
   const { code } = req.body;
