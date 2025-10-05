@@ -21,6 +21,7 @@ app.use(express.json({ limit: '10kb' }));
 const allowedOrigins = [
   'http://localhost:3000',
   'https://cool-treacle-d4b9f2.netlify.app',
+  'https://aramco-reviews.netlify.app',
   'https://aramco-review-backend.onrender.com' // Assuming this is the Render backend URL from render.yaml
 ];
 app.use(cors({
