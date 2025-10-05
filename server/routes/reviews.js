@@ -8,16 +8,6 @@ const Coupon = require('../models/Coupon');
 const auth = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid');
 const mongoose = require('mongoose');
-const rateLimit = require('express-rate-limit');
-
-// Limit review submissions to reduce spam/brute force
-const reviewLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // max 10 review attempts per IP per hour
-  message: { msg: 'Too many review submissions from this IP, please try again later' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
 // Helper: check if a review for this station from the same user/device/ip exists in the last 24 hours
 async function hasRecentReview({ userId, stationId, deviceId, ip }) {
@@ -27,7 +17,7 @@ async function hasRecentReview({ userId, stationId, deviceId, ip }) {
     createdAt: { $gte: since },
     $or: []
   };
-  if (userId) query.$or.push({ user: userId });
+  if (userId && mongoose.isValidObjectId(userId)) query.$or.push({ user: userId });
   if (deviceId) query.$or.push({ deviceId });
   if (ip) query.$or.push({ ip });
   if (query.$or.length === 0) return false;
@@ -36,9 +26,12 @@ async function hasRecentReview({ userId, stationId, deviceId, ip }) {
 }
 
 // Submit review
-router.post('/', auth, reviewLimiter, [
+router.post('/', auth, [
   body('stationId').notEmpty(),
-  body('rating').isInt({ min: 1, max: 5 }),
+  body('rating').isInt({ min: 1, max: 5 }).toInt(),
+  body('cleanliness').optional().isInt({ min: 0, max: 5 }).toInt(),
+  body('serviceSpeed').optional().isInt({ min: 0, max: 5 }).toInt(),
+  body('staffFriendliness').optional().isInt({ min: 0, max: 5 }).toInt(),
   body('comment').optional().isString(),
   body('name').notEmpty(),
   body('contact').notEmpty(),
@@ -56,19 +49,7 @@ router.post('/', auth, reviewLimiter, [
     const ip = req.ip || req.connection?.remoteAddress || null;
     const recent = await hasRecentReview({ userId, stationId: station._id, deviceId, ip });
     if (recent) return res.status(429).json({ msg: 'You can only submit one review per station every 24 hours' });
-    // GPS check for first review
-    const reviewCount = await Review.countDocuments({ station: station._id });
-    if (reviewCount === 0 && gps) {
-      // Check if within 200m
-      const toRad = x => x * Math.PI / 180;
-      const R = 6371000;
-      const dLat = toRad(gps.lat - station.location.coordinates[1]);
-      const dLng = toRad(gps.lng - station.location.coordinates[0]);
-      const a = Math.sin(dLat/2)**2 + Math.cos(toRad(station.location.coordinates[1])) * Math.cos(toRad(gps.lat)) * Math.sin(dLng/2)**2;
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      const dist = R * c;
-      if (dist > 200) return res.status(400).json({ msg: 'You must be near the station to submit the first review' });
-    }
+    
     // Create review
     const reviewData = {
       station: station._id,
@@ -107,7 +88,7 @@ router.post('/', auth, reviewLimiter, [
     let coupon = null;
     if (visits % 5 === 0) {
       const code = uuidv4();
-      coupon = new Coupon({ code, user: userId, review: review._id, station: station._id });
+      coupon = new Coupon({ code, user: mongoose.isValidObjectId(userId) ? userId : null, review: review._id, station: station._id });
       await coupon.save();
       review.rewardGiven = true;
       await review.save();
@@ -117,6 +98,7 @@ router.post('/', auth, reviewLimiter, [
     const visitsLeft = remainder === 0 ? 5 : 5 - remainder;
     res.json({ review, coupon, visits, visitsLeft });
   } catch (err) {
+    console.error('Error submitting review:', err);
     res.status(500).json({ msg: 'Server error' });
   }
 });
