@@ -21,6 +21,6 @@
 - [x] Verify stations can be fetched without authorization errors
 
 ### 4. Deploy and Verify
-- [ ] Deploy updated code to Render
+- [x] Deploy updated code to Render
 - [ ] Test the stations endpoint on production
 - [ ] Confirm error is resolved

@@ -7,7 +7,7 @@ services:
     startCommand: node index.js
     envVars:
       - key: MONGO_URI
-        value: mongodb+srv://Shahnawaz2003:Shahnawaz2003@cluster0.wxtwjas.mongodb.net/aramcoreviews?retryWrites=true&w=majority&appName=Cluster0
+        value: mongodb+srv://Shahnawaz2003:Shahnawaz2003@cluster0.wxtwjas.mongodb.net/aramco_review?retryWrites=true&w=majority&appName=Cluster0
       - key: MONGO_DBNAME
         value: aramco-review
       - key: JWT_SECRET
