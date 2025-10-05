@@ -60,7 +60,7 @@ const lng = 74.3587;
 const lat = 31.5204;
 
 async function run() {
-  const dbName = process.env.MONGO_DBNAME || 'admin';
+  const dbName = process.env.MONGO_DBNAME || 'aramco_review';
   await mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true, dbName });
   for (const s of stations) {
     try {
