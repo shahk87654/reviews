@@ -16,7 +16,24 @@ app.use(xss());
 
 // Limit request body size and enable CORS
 app.use(express.json({ limit: '10kb' }));
-app.use(cors({ origin: true }));
+
+// Enable CORS with specific origin for deployed client
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://cool-treacle-d4b9f2.netlify.app',
+  'https://aramco-review-backend.onrender.com' // Assuming this is the Render backend URL from render.yaml
+];
+app.use(cors({
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  }
+}));
 
 
 
